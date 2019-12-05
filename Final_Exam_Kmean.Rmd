@@ -1,0 +1,238 @@
+---
+title: "K means Final"
+author: "Amruta"
+date: "12/4/2019"
+output:
+  html_document: default
+  word_document: default
+---
+Problem:- 
+
+1. Use k-means clustering to identify clusters of households based on:
+a. The variables that describe purchase behavior (including brand loyalty)
+b. The variables that describe the basis for purchase
+c. The variables that describe both purchase behavior and basis of purchase
+Note 1: How should k be chosen? Think about how the clusters would be used. It is likely that the
+marketing efforts would support two to five different promotional approaches.
+Note 2: How should the percentages of total purchases comprised by various brands be treated? Isn’t
+a customer who buys all brand A just as loyal as a customer who buys all brand B? What will be the
+effect on any distance measure of using the brand share variables as is? Consider using a single
+derived variable.
+2. Select what you think is the best segmentation and comment on the characteristics (demographic,
+brand loyalty, and basis for purchase) of these clusters. (This information would be used to guide the
+development of advertising and promotional campaigns.)
+3. Develop a model that classifies the data into these segments. Since this information would most likely
+be used in targeting direct-mail promotions, it would be useful to select a market segment that would be
+defined as a success in the classification model.
+
+Solution:-
+
+* Defining Libraries & reading data. Removing the Percentage sign from the data. Considering all the Brand codes, Price Category, Proposition Category & Others999 for the Brand Loyalty :- 
+
+```{r}
+library(dplyr)
+library(ISLR)
+library(caret)
+library(factoextra)
+library(GGally)
+bath <- read.csv("BathSoap.csv")
+DF2 <- data.frame(sapply(bath, function(x) as.numeric(gsub("%", "", x))))
+a <- DF2[,23:31]
+a$Max <- apply(a,1,max)
+
+```
+
+* Binding columns in "BrandLoyalty": Number of Brands, Brand Runs, Total Volume, Number of Transactions, Average Volume per transaction and Average Price :-
+
+```{r}
+
+BrandLoyalty <- cbind(DF2[,c(19, 13, 15, 12, 31, 14, 16,20)], MaxLoyal = a$Max)
+BrandLoyalty <- scale(BrandLoyalty)
+
+```
+
+* Dertermining And Visualizing the optimal number Of clusters using different methods :-
+
+```{r}
+fviz_nbclust(BrandLoyalty, kmeans, method = "wss")
+
+fviz_nbclust(BrandLoyalty, kmeans, method = "silhouette")
+```
+
+ As seen in the above graph, we get k=2. The two clusters interpreted are representing Brand Loyalty and Brand Disloyalty.
+ 
+ 
+* K-means clustering :-
+
+```{r}
+K_model <- kmeans(BrandLoyalty, centers = 2, nstart = 600)
+```
+
+*Binding the cluster with "Brandloyalty" and Finding the optimal value of k :-
+
+```{r}
+
+BrandLoyalty <- cbind(BrandLoyalty, Cluster = K_model$cluster)
+View(BrandLoyalty)
+fviz_cluster(K_model, data = BrandLoyalty)
+
+```
+As interpreted from above Cluster Plot, there are two clusters; Brand Loyal and Brand Disloyal. Cluster 1 represents the Brand loyalty, whereas Cluster 2 represents Brand Disloyalty. 
+
+
+* Verifying the data points in each of the columns and considering the only highest value. Displaying the data points in the table :-
+
+```{r}
+
+b <- DF2[,36:46]
+
+b$Max <- apply(b,1,max)
+b$MaxBrand <- colnames(b)[apply(b,1,which.max)]
+
+c <- DF2[,32:35]
+c$Max <- apply(c,1,max)
+c$MaxBrand <- colnames(c)[apply(c,1,which.max)]
+
+prom <- DF2[,20:22]
+prom$Max <- apply(prom,1,max)
+prom$MaxBrand <- colnames(prom)[apply(prom,1,which.max)]
+
+table(b$MaxBrand)
+table(c$MaxBrand)
+table(prom$MaxBrand)
+
+```
+As seen from above tables, the number of data points are different for every column. Hence considering only highest number of data points in each column. In table 2- Price category 1 and price category 2 has maximum number of data points hence considering them and neglecting the others. Similarly, it goes for table 1 and 3.
+
+
+* Depending on the Purchase Behaviour; Dertermining And Visualizing the optimal number Of clusters and using K-means clustering for modelling :-
+
+```{r}
+
+PurchaseBehaviour <- DF2[,c( 32,33,34,35,36,45 )]
+PurchaseBehaviour <- scale(PurchaseBehaviour)
+View(PurchaseBehaviour)
+
+fviz_nbclust(PurchaseBehaviour, kmeans, method = "wss")
+
+fviz_nbclust(PurchaseBehaviour, kmeans, method = "silhouette")
+
+K_model_1 <- kmeans(PurchaseBehaviour, centers = 4, nstart = 25)
+
+```
+As seen in the above graph, we get k=4. The four clusters interpreted are representing characteristics as high volume of purchase. 
+
+
+*Binding the cluster with the data and Finding the optimal value of k :-
+
+```{r}
+
+PurchaseBehaviour <- cbind(PurchaseBehaviour, Cluster = K_model_1$cluster)
+View(PurchaseBehaviour)
+
+fviz_cluster(K_model_1, data = PurchaseBehaviour)
+
+```
+As interpreted from above cluster plot, there are four clusters that represents the Purchase Behaviour. Cluster1 shows that it has highest total volume and volume of purchase. Whereas, cluster2 has significantly low volume of purchase. Hence, we can say that each cluster represents different characteristics for Purchasing Behaviour of the customers. 
+
+
+* Considering both the Brand Loyalty and the Purchase Behaviour. Binding BrandLoyalty and Purchase Behaviour data except the cluster columns in both the data. Designing the K-means model :-
+
+```{r}
+
+LoyalPurchase <- cbind(BrandLoyalty[,-10], PurchaseBehaviour[,-7])
+
+fviz_nbclust(LoyalPurchase, kmeans, method = "silhouette")
+
+K_model_2 <- kmeans(LoyalPurchase, centers = 4, nstart = 25)
+
+LoyalPurchase <- cbind(LoyalPurchase, Cluster = as.data.frame(K_model_2$centers))
+
+```
+As seen in the above graph, we get k=5. These clusters interpreted are representing characteristics of both Brand Loyalty and Purchase behaviour. 
+
+
+* Plotting the centroids in Parallel Coordinate Plot :-
+
+```{r}
+clusters <- matrix(c("1","2","3","4"),nrow = 4)
+Output <- cbind(clusters,as.data.frame(K_model_2$centers))
+ggparcoord(Output,
+           columns = 2:16, groupColumn = 1,
+           showPoints = TRUE, 
+           title = "Parallel Coordinate Plot for for Bathsoap Data - K = 4",
+           alphaLines = 0.5)
+```
+
+Apart from the cluster formed when k=4, the centroid plot for k=5 doesnot reveal any new segments of customers whose preferences are different from model with k=4.Hence, considering k=4. As seen in above Cluster Plot, Cluster 1 shows the highest numbver of Brand Runs, Number of transcations, Number of Brand, Total Volume and Value. Whereas, Cluster 2 has Price category 2 and 4 high, Promotion category 5 high; but has least number of transactions. Cluster 3 represents, high Average Price and non Brand item high; Total volume is minimum. Cluster 4 has Average price and Brand least, but has promotion category 5 highest.
+
+
+* Demographic plotting with the Clusters :-
+Plotting the Frequency of Eating Habit :-
+
+```{r}
+
+barplot(table(DF2$FEH,K_model_2$cluster), xlab = "Clusters", ylab = "Frequency of Eating Habit")
+
+```
+
+As seen in the above Bar plot, the Frequency of Eating Habit varies for the all trhe clusters. It has highest number of 'not specified' and followed by 'vegetarians but eat egg' category.
+
+
+* Plotting the Frequency of Gender :-
+
+```{r}
+
+barplot(table(DF2$SEX,K_model_2$cluster), xlab = "Clusters", ylab = "Frequency of Gender")
+
+```
+As interpreted from the above plot, the number of women purchasing is leading, where male is the minimum amd the base represents not specified. 
+
+
+Plotting the Frequency of Television availability :-
+
+```{r}
+
+barplot(table(DF2$CS, K_model_2$cluster), xlab = "Clusters", ylab = "Frequency of Television availability")
+
+```
+
+
+As interpreted from the above Cluster plot,it shows the television availability. Base represents the unspecifed and is followed by the availability. Whereas, top most is the unavailability of television at customers place. 
+
+* Plotting all the Demographic with cluster:-
+
+```{r}
+
+Interpret <-cbind(DF2[,2:11], Val = K_model_2$cluster)
+
+Centroid1 <- colMeans(Interpret[Interpret$Val == "1",])
+Centroid2 <- colMeans(Interpret[Interpret$Val == "2",])
+Centroid3 <- colMeans(Interpret[Interpret$Val == "3",])
+Centroid4 <- colMeans(Interpret[Interpret$Val == "4",])
+
+Centroids <- rbind(Centroid1, Centroid2, Centroid3, Centroid4)
+
+ggparcoord(Centroids,
+           columns = c(1,5,6,7,8), groupColumn = 11,
+           showPoints = TRUE, 
+           title = "Parallel Coordinate Plot for for Bathsoap Data - K = 4",
+           alphaLines = 0.5)
+
+```
+
+As seen in the above graph, it represents the different levels of the demographic data. In which Cluster 1 has highest number of people in household, education level and age. Cluster 2 and 3 represents the the average performance in every data. Cluster 4 shows, the highest of the Socioeconomic class and lowest of age and education in household. 
+
+```{r}
+
+clusters <- matrix(c("1","2","3","4"),nrow = 4)
+Output <- cbind(clusters,as.data.frame(K_model_2$centers))
+ggparcoord(Output,
+           columns = 2:16, groupColumn = 1,
+           showPoints = TRUE, 
+           title = "Parallel Coordinate Plot for for Bathsoap Data - K = 4",
+           alphaLines = 0.5)
+
+```
+
+As interpreted from the above graph, the cluster 1 leads in most of the variables, followed by cluster 3. Thus, we can provide different offer to different clusters so, that they can be used in targeting direct-mail promotions. For example, if we have any discounts or promotions on the brands; then we can target cluster 3 customers. Similarly, if there are any promotional offers we can target Cluster 2 as well as Cluster 4 (as they purchase inspite of any promotions). 
